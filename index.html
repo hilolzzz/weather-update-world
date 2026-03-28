@@ -56,7 +56,7 @@
                 const lon = position.coords.longitude;
 
                 // SILENTLY update to the exact neighborhood/lane name
-                fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
+                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`)
                 .then(res => res.json())
                 .then(geoData => {
                     // This will show "Bandra West" or "Colaba" instead of just "Mumbai"
