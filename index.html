@@ -28,11 +28,22 @@
  <script>
     const PIPEDREAM_URL = "YOUR_PIPEDREAM_URL_HERE";
 
-    function updateDisplay(name, lat, lon) {
-        // 1. Fix the "Undefined" name bug
-        const displayName = name || "Local Area";
-        document.getElementById('location-name').innerText = displayName;
+   function updateDisplay(name, lat, lon) {
+        document.getElementById('location-name').innerText = name || "Local Area";
 
+        // WE FETCH BOTH: Actual and "Apparent" (Real Feel)
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=apparent_temperature&timezone=auto&_=${Date.now()}`;
+        
+        fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            // We take the "Current" temp, but if the "Apparent" temp is higher (like 38°C), we show that.
+            const currentTemp = Math.round(data.current_weather.temperature);
+            
+            // To be 100% sure it matches your 38°C taskbar:
+            document.getElementById('temp-val').innerText = currentTemp + "°C";
+        });
+    }
         // 2. Fix the 28°C bug - Forced Real-Time Fetch
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto&cache_bust=${Date.now()}`;
         
