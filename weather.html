@@ -59,13 +59,16 @@
     };
 
     // Update on click using GPS
-    function updateWeather() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true });
-                updateWeatherDisplay(`${p.coords.latitude},${p.coords.longitude}`, true);
-            });
-        }
+   function updateWeather() {
+    if (navigator.geolocation) {
+        // We add the { enableHighAccuracy: true } part here
+        navigator.geolocation.getCurrentPosition(p => {
+            updateWeatherDisplay(`${p.coords.latitude},${p.coords.longitude}`, true);
+        }, (error) => {
+            console.log("GPS failed, staying on IP location");
+        }, { enableHighAccuracy: true, timeout: 5000 }); 
     }
+}
 </script>
 </body>
 </html>
