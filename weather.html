@@ -62,7 +62,7 @@
     // Update on click using GPS
     function updateWeather() {
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(p => {
+            navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true });
                 updateWeatherDisplay(`${p.coords.latitude},${p.coords.longitude}`, true);
             });
         }
