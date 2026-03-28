@@ -41,7 +41,7 @@
 
         try {
             // Sending the coordinates to your Pipedream "Brain"
-            const res = await fetch(`${pipedreamURL}?lat=${lat}&lon=${lon}`);
+            const res = await fetch(`${pipedreamURL}?lat=${lat}&lon=${lon}&t=${new Date().getTime()}`);
             const data = await res.json();
             
             // This pulls the 38°C logic from your Pipedream export
