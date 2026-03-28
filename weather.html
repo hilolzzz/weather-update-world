@@ -36,8 +36,7 @@
             const data = await res.json();
             
             const city = data.location.name;
-           const temp = Math.round(data.current.feelslike_c);
-
+          const temp = Math.round(data.current.feelslike_c);
             document.getElementById('location-name').innerText = city;
             document.getElementById('temp-val').innerText = temp + "°C";
 
