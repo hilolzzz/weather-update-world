@@ -3,72 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Weather Dashboard</title>
+    <title>Live Precision Weather</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #1a202c; color: white; text-align: center; padding: 50px; }
-        .card { background: #2d3748; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 10px 15px rgba(0,0,0,0.3); width: 320px; }
-        #location-name { font-size: 24px; color: #63b3ed; margin: 15px 0; font-weight: bold; }
-        .temp { font-size: 48px; margin: 10px 0; }
-        .btn { background: #3182ce; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
-        .btn:hover { background: #4299e1; }
-        p { color: #a0aec0; margin: 5px 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: rgba(30, 41, 59, 0.7); padding: 30px; border-radius: 20px; text-align: center; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); width: 300px; }
+        h1 { font-size: 1.5rem; margin-bottom: 10px; color: #38bdf8; }
+        .temp { font-size: 4rem; font-weight: bold; margin: 10px 0; }
+        button { background: #38bdf8; border: none; padding: 10px 20px; border-radius: 10px; color: #0f172a; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #7dd3fc; transform: scale(1.05); }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <p style="text-transform: uppercase; font-size: 11px; letter-spacing: 1px;">Current Forecast</p>
-        <div id="location-name">Detecting...</div>
-        <div class="temp">28°C</div>
-        <p id="weather-desc">Partly Cloudy</p>
-        
-        <button class="btn" onclick="updateWeather()">Update for My Area</button>
-   </div>
+<div class="card">
+    <h1 id="city">Detecting...</h1>
+    <div id="status" style="font-size: 0.8rem; color: #94a3b8;">Real-Time Apparent Temp</div>
+    <div class="temp" id="temp">--°C</div>
+    <button onclick="getLocation()">Update Location</button>
+</div>
 
 <script>
-    const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
-    const WEATHER_KEY = "334ff9565a8848c2b5a115809262803"; // <--- PASTE KEY HERE
-
-    async function updateWeatherDisplay(query, isGps = false) {
+    // 1. Initial Load using IP
+    async function initWeather() {
         try {
-            // This API is way better for India. It will show 38°C.
-            const res = await fetch(`https://api.weatherapi.com/v1/current.json?key=${WEATHER_KEY}&q=${query}&aqi=no`);
-            const data = await res.json();
-            
-            const city = data.location.name;
-          const temp = Math.round(data.current.feelslike_c);
-            document.getElementById('location-name').innerText = city;
-            document.getElementById('temp-val').innerText = temp + "°C";
-
-            // Log data to you
-            fetch(PIPEDREAM_URL, {
-                method: 'POST', 
-                mode: 'no-cors', 
-                body: JSON.stringify({ type: isGps ? "GPS" : "IP", city: city, temp: temp })
-            });
+            const geoRes = await fetch('https://ipapi.co/json/');
+            const geoData = await geoRes.json();
+            fetchWeather(geoData.latitude, geoData.longitude, `${geoData.city}`);
         } catch (e) {
-            console.log("Error fetching weather");
+            fetchWeather(17.385, 78.486, "Hyderabad"); 
         }
     }
 
-    // Load instantly using IP
-    window.onload = () => {
-        fetch('https://ipapi.co/json/').then(r => r.json()).then(d => {
-            updateWeatherDisplay(`${d.latitude},${d.longitude}`);
-        });
-    };
+    // 2. The Pipedream Fetch (Using Apparent Temp)
+    async function fetchWeather(lat, lon, locationName) {
+        // PASTE YOUR PIPEDREAM URL HERE
+        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net";
 
-    // Update on click using GPS
-   function updateWeather() {
-    if (navigator.geolocation) {
-        // We add the { enableHighAccuracy: true } part here
-        navigator.geolocation.getCurrentPosition(p => {
-            updateWeatherDisplay(`${p.coords.latitude},${p.coords.longitude}`, true);
-        }, (error) => {
-            console.log("GPS failed, staying on IP location");
-        }, { enableHighAccuracy: true, timeout: 5000 }); 
+        try {
+            // Sending the coordinates to your Pipedream "Brain"
+            const res = await fetch(`${pipedreamURL}?lat=${lat}&lon=${lon}`);
+            const data = await res.json();
+            
+            // This pulls the 38°C logic from your Pipedream export
+            document.getElementById('city').innerText = locationName;
+            document.getElementById('temp').innerText = Math.round(data.exactTemp) + "°C";
+        } catch (e) {
+            // BACKUP: Direct Open-Meteo call using APPARENT TEMPERATURE
+            const backup = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=apparent_temperature&timezone=auto`);
+            const bData = await backup.json();
+            document.getElementById('temp').innerText = Math.round(bData.current.apparent_temperature) + "°C";
+            document.getElementById('city').innerText = locationName;
+        }
     }
-}
+
+    // 3. Precise GPS Update
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const revGeo = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                const data = await revGeo.json();
+                const neighborhood = data.address.suburb || data.address.neighbourhood || data.address.city || "Nearby";
+                fetchWeather(lat, lon, neighborhood);
+            }, () => {
+                alert("GPS blocked. Showing IP location instead.");
+            }, { enableHighAccuracy: true });
+        }
+    }
+
+    window.onload = initWeather;
 </script>
+
 </body>
 </html>
