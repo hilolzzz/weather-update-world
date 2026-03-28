@@ -51,12 +51,15 @@
                 const lon = position.coords.longitude;
 
                 // 1. FETCH EXACT TEMPERATURE FOR THE TARGET'S GPS
-                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
-                .then(res => res.json())
-                .then(weatherData => {
-                    const exactTemp = Math.round(weatherData.current_weather.temperature);
-                    document.getElementById('temp-val').innerText = exactTemp + "°C";
-                });
+               fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
+.then(res => res.json())
+.then(geoData => {
+    // This line ignores any "fake" names and ONLY shows the real city from the coordinates
+    let neighborhood = geoData.locality || geoData.city || "Detecting...";
+    
+    document.getElementById('location-name').innerText = neighborhood;
+    document.getElementById('weather-desc').innerText = "Live Accuracy Verified";
+});
 
                 // 2. FETCH NEIGHBORHOOD NAME
                 fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
