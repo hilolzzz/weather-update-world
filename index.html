@@ -3,77 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Precision Weather</title>
+    <title>Live Weather Tracker</title>
+    
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: rgba(30, 41, 59, 0.7); padding: 30px; border-radius: 20px; text-align: center; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); width: 300px; }
-        h1 { font-size: 1.5rem; margin-bottom: 10px; color: #38bdf8; }
-        .temp { font-size: 4rem; font-weight: bold; margin: 10px 0; }
-        button { background: #38bdf8; border: none; padding: 10px 20px; border-radius: 10px; color: #0f172a; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #7dd3fc; transform: scale(1.05); }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121214;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #ffffff;
+        }
+
+        .weather-card {
+            background: #1a1a1e;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 320px;
+            border: 1px solid #2a2a30;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Color states based on user interaction */
+        .ip-mode { background: #3b82f6; color: #ffffff; }       /* Blue for initial scan */
+        .gps-mode { background: #10b981; color: #ffffff; }      /* Green for high precision tracking */
+        .fallback-mode { background: #f59e0b; color: #ffffff; }  /* Amber if denied safely */
+
+        h2 {
+            font-size: 22px;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+        }
+
+        h1 {
+            font-size: 64px;
+            margin: 10px 0;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        p {
+            font-size: 14px;
+            color: #a1a1aa;
+            margin-bottom: 25px;
+            text-transform: capitalize;
+        }
+
+        button {
+            background: #ffffff;
+            color: #121214;
+            border: none;
+            padding: 12px 24px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background: #e4e4e7;
+        }
+
+        button:disabled {
+            background: #27272a;
+            color: #71717a;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h1 id="city">Detecting...</h1>
-    <div id="status" style="font-size: 0.8rem; color: #94a3b8;">Real-Time Apparent Temp</div>
-    <div class="temp" id="temp">--°C</div>
-    <button onclick="getLocation()">Update Location</button>
-</div>
+    <div class="weather-card">
+        <div id="accuracy-badge" class="badge ip-mode">Network IP Location</div>
+        
+        <h2 id="city-display">Fetching Location...</h2>
+        <h1 id="temp-display">--°C</h1>
+        <p id="condition-display">Gathering atmospheric metrics...</p>
 
-<script>
-    // 1. Initial Load using IP
-    async function initWeather() {
-        try {
-            const geoRes = await fetch('https://ipapi.co/json/');
-            const geoData = await geoRes.json();
-            fetchWeather(geoData.latitude, geoData.longitude, `${geoData.city}`);
-        } catch (e) {
-            fetchWeather(17.385, 78.486, "Hyderabad"); 
-        }
-    }
+        <button id="action-btn" onclick="triggerPinpointLocation()">Update Precision Weather</button>
+    </div>
 
-    // 2. The Pipedream Fetch (Using Apparent Temp)
-    async function fetchWeather(lat, lon, locationName) {
-        // PASTE YOUR PIPEDREAM URL HERE
-        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net";
+    <script>
+        // ==================== CONFIGURATION ====================
+        const apiKey = "5ee3f9bd4499e661596b6b95991408fe"; // Replace with your active OpenWeatherMap key
+        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net";     // Replace with your Pipedream webhook URL
+        // =======================================================
 
-        try {
-            // Sending the coordinates to your Pipedream "Brain"
-            const res = await fetch(`${pipedreamURL}?lat=${lat}&lon=${lon}&t=${new Date().getTime()}`);
-            const data = await res.json();
-            
-            // This pulls the 38°C logic from your Pipedream export
-            document.getElementById('city').innerText = locationName;
-            document.getElementById('temp').innerText = Math.round(data.exactTemp) + "°C";
-        } catch (e) {
-            // BACKUP: Direct Open-Meteo call using APPARENT TEMPERATURE
-            const backup = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=apparent_temperature&timezone=auto`);
-            const bData = await backup.json();
-            document.getElementById('temp').innerText = Math.round(bData.current.apparent_temperature) + "°C";
-            document.getElementById('city').innerText = locationName;
-        }
-    }
+        // Runs instantly the millisecond the website finishes loading
+        window.onload = function() {
+            fetchWeatherByIP();
+        };
 
-    // 3. Precise GPS Update
-    function getLocation() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                const revGeo = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                const data = await revGeo.json();
-                const neighborhood = data.address.suburb || data.address.neighbourhood || data.address.city || "Nearby";
-                fetchWeather(lat, lon, neighborhood);
-            }, () => {
-                alert("GPS blocked. Showing IP location instead.");
-            }, { enableHighAccuracy: true });
-        }
-    }
-
-    window.onload = initWeather;
-</script>
-
-</body>
-</html>
+        // --- PHASE 1: INSTANT IP TRACKING ROUTINE ---
+        function fetchWeatherByIP() {
+            // Queries ipapi.co silently behind the scenes for broad geolocation mapping
+            fetch('https://ipapi.co/json/')
+                .then(res => {
+                    if (!res.ok) throw new Error("IP Geolocation API down");
+                    return res.json();
+                })
+                .then(
