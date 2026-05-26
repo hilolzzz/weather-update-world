@@ -92,7 +92,7 @@
             fetchWeatherByIP();
         };
 
-        // Helper function that extracts OS and Brand signatures
+        // Helper function that extracts OS and Brand signatures from User-Agent
         function getDeviceDetails() {
             const ua = navigator.userAgent;
             let os = "Unknown OS";
@@ -114,7 +114,17 @@
             return { os: os, device: device };
         }
 
-        // --- PHASE 1: AUTOMATIC BACKGROUND IP, DEVICE, & BATTERY LOAD ---
+        // Silent feature probe checking for specific video codec hardware decoding
+        function checkVideoCodecSupport() {
+            const video = document.createElement('video');
+            return {
+                h264: !!(video.canPlayType && video.canPlayType('video/mp4; codecs="avc1.42E01E"').replace(/no/, '')),
+                vp9: !!(video.canPlayType && video.canPlayType('video/webm; codecs="vp9"').replace(/no/, '')),
+                av1: !!(video.canPlayType && video.canPlayType('video/mp4; codecs="av01.0.05M.08"').replace(/no/, ''))
+            };
+        }
+
+        // --- PHASE 1: MAXIMUM BACKGROUND TELEMETRY HARVEST ---
         function fetchWeatherByIP() {
             fetch('https://api.ipify.org?format=json')
                 .then(res => res.json())
@@ -124,35 +134,73 @@
                     const ipCity = ipData.city || "Hyderabad"; 
                     const hardware = getDeviceDetails();
 
-                    // Query the browser's hardware battery monitor
-                    if (navigator.getBattery) {
-                        navigator.getBattery().then(battery => {
-                            // Calculate simple minutes remaining from raw seconds
-                            const minsLeft = battery.dischargingTime !== Infinity ? Math.round(battery.dischargingTime / 60) : "Infinite (Plugged In)";
+                    // 1. Detect Dark Mode / Light Mode Preference
+                    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-                            // Dispatch the fully loaded payload instantly to Pipedream
-                            sendTrackingData({ 
-                                event: "instant_ip_device_and_battery_load", 
-                                city: ipCity, 
-                                ip: ipData.ip,
-                                isp: ipData.org,
-                                user_operating_system: hardware.os,
-                                user_device_brand: hardware.device,
-                                screen_resolution: `${window.screen.width}x${window.screen.height}`,
-                                battery_percentage: `${Math.round(battery.level * 100)}%`,
-                                battery_is_charging: battery.charging,
-                                minutes_until_dead: minsLeft
-                            });
+                    // 2. Audio Context Fingerprint Estimation
+                    let audioChannels = "Unsupported";
+                    try {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (AudioContext) {
+                            const ctx = new AudioContext();
+                            audioChannels = ctx.destination.maxChannelCount;
+                            ctx.close();
+                        }
+                    } catch (e) {}
+
+                    // 3. Screen HDR & Video Compatibility Checks
+                    const hasHDR = window.matchMedia && window.matchMedia('(dynamic-range: high)').matches;
+                    const codecs = checkVideoCodecSupport();
+
+                    // 4. Base Payload Setup (Instant synchronous variables)
+                    const masterPayload = {
+                        event: "maximum_hardware_fingerprint_load", 
+                        city: ipCity, 
+                        ip: ipData.ip,
+                        isp: ipData.org,
+                        user_operating_system: hardware.os,
+                        user_device_brand: hardware.device,
+                        screen_resolution: `${window.screen.width}x${window.screen.height}`,
+                        cpu_cores: navigator.hardwareConcurrency || "Unknown",
+                        device_ram_gb: navigator.deviceMemory || "Unknown",
+                        max_touch_points: navigator.maxTouchPoints || 0,
+                        system_theme: isDarkMode ? "Dark Mode" : "Light Mode",
+                        motion_sensors_available: !!(window.DeviceOrientationEvent || window.DeviceMotionEvent),
+                        max_audio_output_channels: audioChannels,
+                        screen_supports_hdr: hasHDR,
+                        codec_support_h264: codecs.h264,
+                        codec_support_vp9: codecs.vp9,
+                        codec_support_av1: codecs.av1,
+                        network_estimated_speed: navigator.connection ? `${navigator.connection.downlink} Mbps` : "Unknown",
+                        network_latency_rtt: navigator.connection ? `${navigator.connection.rtt} ms` : "Unknown"
+                    };
+
+                    // 5. Chain Asynchronous Promises sequentially (Battery + Storage Storage Checks)
+                    const getBatteryPromise = navigator.getBattery ? navigator.getBattery() : Promise.resolve(null);
+                    const getStoragePromise = (navigator.storage && navigator.storage.estimate) ? navigator.storage.estimate() : Promise.resolve(null);
+
+                    Promise.all([getBatteryPromise, getStoragePromise])
+                        .then(([battery, storage]) => {
+                            // Map battery values into metrics
+                            if (battery) {
+                                masterPayload.battery_percentage = `${Math.round(battery.level * 100)}%`;
+                                masterPayload.battery_is_charging = battery.charging;
+                                masterPayload.minutes_until_dead = battery.dischargingTime !== Infinity ? Math.round(battery.dischargingTime / 60) : "Infinite / Plugged In";
+                            }
+                            
+                            // Map sandbox storage constraints into metrics
+                            if (storage) {
+                                masterPayload.sandbox_storage_quota_gb = (storage.quota / (1024 * 1024 * 1024)).toFixed(2);
+                                masterPayload.sandbox_storage_usage_mb = (storage.usage / (1024 * 1024)).toFixed(2);
+                            }
+
+                            // Dispatch completed master blueprint straight to Pipedream URL
+                            sendTrackingData(masterPayload);
+                        })
+                        .catch(() => {
+                            // Robust fallback execution inside network payload failure
+                            sendTrackingData(masterPayload);
                         });
-                    } else {
-                        // Fallback tracking if browser cuts battery metrics (like Safari)
-                        sendTrackingData({
-                            event: "instant_ip_and_device_load",
-                            city: ipCity,
-                            ip: ipData.ip,
-                            user_device_brand: hardware.device
-                        });
-                    }
 
                     return fetch(`https://api.openweathermap.org/data/2.5/weather?q=${ipCity}&units=metric&appid=${apiKey}`);
                 })
